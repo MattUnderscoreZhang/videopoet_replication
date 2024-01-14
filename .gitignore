@@ -162,5 +162,5 @@ cython_debug/
 #.idea/
 
 # my project
-data/*
+data/video/*
 *.mp4

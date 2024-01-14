@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["cross_platform"]
 lock_version = "4.4"
-content_hash = "sha256:aedbcf79aa1c66c49b9562a4749d3fa2662a92fc4c6b16efb1086f6d92979a3f"
+content_hash = "sha256:1308bc696a9475816cffd587b0acd28edc07c477aa9c57e7e3cba386944907f2"
 
 [[package]]
 name = "accelerate"
@@ -586,6 +586,16 @@ dependencies = [
 files = [
     {file = "pytorch-warmup-0.1.1.tar.gz", hash = "sha256:c594760b29657a127aa6a8c3424dd0b5068140b3b7d4988118f4a9f3e99b1457"},
     {file = "pytorch_warmup-0.1.1-py3-none-any.whl", hash = "sha256:eecc4af0975bb181198c0817be145bccb17c7ea09ce3fdf69140f65d8c32b746"},
+]
+
+[[package]]
+name = "pytube"
+version = "15.0.0"
+requires_python = ">=3.7"
+summary = "Python 3 library for downloading YouTube Videos."
+files = [
+    {file = "pytube-15.0.0-py3-none-any.whl", hash = "sha256:07b9904749e213485780d7eb606e5e5b8e4341aa4dccf699160876da00e12d78"},
+    {file = "pytube-15.0.0.tar.gz", hash = "sha256:076052efe76f390dfa24b1194ff821d4e86c17d41cb5562f3a276a8bcbfc9d1d"},
 ]
 
 [[package]]
