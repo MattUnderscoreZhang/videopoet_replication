@@ -162,5 +162,7 @@ cython_debug/
 #.idea/
 
 # my project
-data/video/*
+data/videos/unprocessed/*
+data/videos/processed/*
+wandb/
 *.mp4

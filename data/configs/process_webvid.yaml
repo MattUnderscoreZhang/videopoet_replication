@@ -1,0 +1,41 @@
+subsampling:
+    FrameSubsampler:
+        args:
+           frame_rate: 8
+    ResolutionSubsampler:
+        args:
+            width: 128
+            height: 224
+            resize_mode: "scale,crop,pad"
+    CutDetectionSubsampler:
+        cuts_are_clips: True
+        args:
+            cut_detection_mode: "all"
+            framerates: null
+            threshold: 27
+            min_scene_len: 15
+    ClippingSubsampler:
+        args:
+            min_length: 2.125
+            max_length: 2.125
+            max_length_strategy: "all"
+            precision: "exact"
+
+reading:
+    yt_args:
+        download_size: 360
+        download_audio_rate: 44100
+        yt_metadata_args: null
+    timeout: 60
+    sampler: null
+
+storage:
+    number_sample_per_shard: 1000
+    oom_shard_count: 5
+    captions_are_subtitles: False
+
+distribution:
+    processes_count: 16
+    thread_count: 32
+    subjob_size: 1000
+    distributor: "multiprocessing"
