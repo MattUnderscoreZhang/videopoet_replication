@@ -162,6 +162,7 @@ cython_debug/
 #.idea/
 
 # my project
+.DS_Store
 data/videos/unprocessed/*
 data/videos/processed/*
 wandb/
