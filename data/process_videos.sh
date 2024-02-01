@@ -6,14 +6,14 @@ if [ "$1" = "webvid" ]; then
         --output-format="webdataset" \
         --output_folder="videos/processed/webvid" \
         --stage "subset" \
-        --config "configs/process_webvid.yaml"
+        --config "configs/webvid.yaml"
 elif [ "$1" = "webvid_sample" ]; then
     video2dataset --url_list="videos/unprocessed/webvid_sample/00000.tar" \
         --input_format="webdataset" \
         --output-format="webdataset" \
         --output_folder="videos/processed/webvid_sample" \
         --stage "subset" \
-        --config "configs/process_webvid.yaml"
+        --config "configs/webvid_mini.yaml"
 else
     echo "Unknown argument $1"
 fi
