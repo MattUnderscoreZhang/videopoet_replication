@@ -1,7 +1,9 @@
 import atexit
 import os
 import tempfile
-from typing import Any
+
+from .distributor import multiprocessing_distributor
+from .shard_generator import URLShardGeneratorFromCSV
 
 
 def create_temp_dir() -> str:
@@ -24,4 +26,21 @@ if __name__ == "__main__":
     temp_dir = create_temp_dir()
 
     # Your main program logic here
-    ...
+    shard_generator = URLShardGeneratorFromCSV(
+        url_list,
+        url_col="url",
+        caption_col=None,
+        clip_col=None,
+        save_additional_columns=None,
+        config["storage"]["number_sample_per_shard"],
+        done_shards,
+        tmp_path,
+        config["reading"]["sampler"],
+    )
+
+    multiprocessing_distributor(
+        processes_count=16,
+        worker,
+        shard_iterator,
+        max_shard_retry=1,
+    )

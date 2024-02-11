@@ -64,7 +64,6 @@ class BufferedParquetWriter:
             self.output_fd.close()
 
 
-
 class WebDatasetSampleWriter:
     """
     Writes videos and captions to webdataset format.
