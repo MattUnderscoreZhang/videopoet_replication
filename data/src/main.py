@@ -7,11 +7,12 @@ from .shard_generator import URLShardGeneratorFromCSV
 
 
 def create_temp_dir() -> str:
+    """Create a temporary directory and register it for cleanup on program exit."""
+
     temp_dir = tempfile.mkdtemp()
 
     # Deletes temp_dir if program terminates
     def cleanup_temp_dir() -> None:
-        """Deletes the temporary directory. """
         print("Cleaning up temporary directory")
         os.rmdir(temp_dir)
 
@@ -22,20 +23,14 @@ def create_temp_dir() -> str:
 
 
 if __name__ == "__main__":
-    # Create a temporary directory
     temp_dir = create_temp_dir()
 
-    # Your main program logic here
     shard_generator = URLShardGeneratorFromCSV(
-        url_list,
-        url_col="url",
-        caption_col=None,
-        clip_col=None,
-        save_additional_columns=None,
-        config["storage"]["number_sample_per_shard"],
-        done_shards,
-        tmp_path,
-        config["reading"]["sampler"],
+        csv_url,
+        csv_url_col="url",
+        n_samples_per_shard=100,
+        processed_shard_ids,
+        tmp_dir,
     )
 
     multiprocessing_distributor(

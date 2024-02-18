@@ -16,77 +16,71 @@ class URLShardGeneratorFromCSV:
 
     def __init__(
         self,
-        url_list: str,
-        url_col: str,
-        caption_col: str,
-        clip_col: str,
-        save_additional_columns: list[str],
-        number_sample_per_shard: int,
-        done_shards: set,
-        tmp_path: str,
-        sampler: Callable[[list[tuple[int, int]]], list[tuple[int, int]]] = lambda x: x,
+        csv_url: str,  # can be either file path or directory path
+        csv_url_col: str,  # name of the column containing video URLs
+        n_samples_per_shard: int,  # number of sample IDs in each shard file
+        processed_shard_ids: set[int],  # skip these IDs during sharding
+        shard_dir: str,  # directory to write shard files to
     ) -> None:
-        self.url_col = url_col
-        self.caption_col = caption_col
-        self.clip_col = clip_col
-        self.save_additional_columns = save_additional_columns
-        self.number_sample_per_shard = number_sample_per_shard
-        self.done_shards = done_shards
-        self.shard_sampler = sampler
+        csv_filesystem, csv_filepath = fsspec.core.url_to_fs(csv_url)
+        self.csv_filesystem = csv_filesystem
+        self.csv_filepaths = (
+            [csv_filepath]
+            if not csv_filesystem.isdir(csv_filepath)
+            else sorted(csv_filesystem.glob(csv_filepath + "/*.csv"))
+        )
+        if len(self.csv_filepaths) == 0:
+            raise ValueError(f"No .csv files found for path {csv_filepath}")
 
-        fs, url_path = fsspec.core.url_to_fs(url_list)
-        self.fs = fs
-        self.tmp_path = tmp_path
+        self.csv_url_col = csv_url_col
+        self.n_samples_per_shard = n_samples_per_shard
+        self.processed_shard_ids = processed_shard_ids
+        self.shard_dir = shard_dir
 
-        if fs.isdir(url_path):
-            self.input_files = sorted(fs.glob(url_path + "/*.csv"))
-            if len(self.input_files) == 0:
-                raise ValueError(f"No file found at path {url_path} with extension csv")
-        else:
-            self.input_files = [url_path]
-
-        self.column_list = self.save_additional_columns or []
-        self.column_list += ["clips"] * bool(self.clip_col) + ["caption"] * bool(self.caption_col) + ["url"]
-
-    def _save_to_arrow(self, input_file: str, start_shard_id: int) -> tuple[list[tuple[int, str]], int]:
-        """Read the input file and save to arrow files in a temporary directory"""
-        with self.fs.open(input_file, mode="rb") as file:
+        self.column_list = ["url"]
+    
+    def _get_and_format_data_from_csv_file(self, csv_filepath: str) -> None:
+        """Extract data from a CSV file, rename the columns, and return data."""
+        with self.csv_filesystem.open(csv_filepath, mode="rb") as file:
             data = pyarrow.Table.from_pandas(pandas.read_csv(file))
 
-        column_names = data.column_names
-        if self.caption_col is not None:
-            column_names = [c if c != self.caption_col else "caption" for c in column_names]
-        if self.clip_col is not None:
-            column_names = [c if c != self.clip_col else "clips" for c in column_names]
-        column_names = [c if c != self.url_col else "url" for c in column_names]
+        # rename self.csv_url_col to "url"
+        return data.rename_columns(
+            [
+                "url"
+                if column_name == self.csv_url_col
+                else column_name
+                for column_name in data.column_names
+            ]
+        )
 
-        data = data.rename_columns(column_names)
-
+    def _save_to_arrow(self, csv_filepath: str, start_shard_id: int) -> tuple[list[tuple[int, str]], int]:
+        """Read the input file and save to arrow files in a temporary directory"""
+        data = self._get_and_format_data_from_csv_file(csv_filepath)
         number_samples = data.num_rows
 
-        number_shards = math.ceil(data.num_rows / self.number_sample_per_shard)
+        n_shards = math.ceil(data.num_rows / self.n_samples_per_shard)
         shards_to_write = [
             (start_shard_id + shard_id, shard_id)
-            for shard_id in range(number_shards)
-            if start_shard_id + shard_id not in self.done_shards
+            for shard_id in range(n_shards)
+            if start_shard_id + shard_id not in self.processed_shard_ids
         ]
 
-        shards_to_write = self.shard_sampler(shards_to_write)
-        number_shards = len(shards_to_write)
+        n_shards = len(shards_to_write)
 
         if len(shards_to_write) == 0:
-            return [], number_shards
+            return [], n_shards
 
         def write_shard(t: tuple[int, int]) -> tuple[int, str]:
             full_shard_id, shard_id = t
-            begin_shard = shard_id * self.number_sample_per_shard
-            end_shard = min(number_samples, (1 + shard_id) * self.number_sample_per_shard)
+            begin_shard = shard_id * self.n_samples_per_shard
+            end_shard = min(number_samples, (1 + shard_id) * self.n_samples_per_shard)
             df_shard = data.slice(begin_shard, end_shard - begin_shard).select(self.column_list)
-            tmp_file = self.tmp_path + f"/{full_shard_id}.feather"
+            tmp_file = self.shard_dir + f"/{full_shard_id}.feather"
             for i in range(10):
                 try:
-                    fs, tmp_path = fsspec.core.url_to_fs(tmp_file)
-                    with fs.open(tmp_path, "wb") as file:
+                    csv_filesystem, shard_dir = fsspec.core.url_to_fs(tmp_file)
+                    with csv_filesystem.open(shard_dir, "wb") as file:
                         with pyarrow.ipc.new_file(file, df_shard.schema) as writer:
                             writer.write_table(df_shard)
                     return (full_shard_id, tmp_file)
@@ -118,7 +112,7 @@ class URLShardGeneratorFromCSV:
 
         del data
 
-        return shards, number_shards
+        return shards, n_shards
 
     def __iter__(self) -> tuple[str, int]:
         """
@@ -131,10 +125,10 @@ class URLShardGeneratorFromCSV:
             tuple[str, int]: A tuple containing the Arrow file and the shard ID.
         """
         start_shard_id = 0
-        for i, input_file in enumerate(self.input_files):
-            print(f"Sharding file number {i + 1} of {len(self.input_files)} called {input_file}")
+        for i, csv_filepath in enumerate(self.csv_filepaths):
+            print(f"Sharding file number {i + 1} of {len(self.csv_filepaths)} called {csv_filepath}")
 
-            shards, number_shards = self._save_to_arrow(input_file, start_shard_id)
+            shards, n_shards = self._save_to_arrow(csv_filepath, start_shard_id)
             print(f"File sharded into {len(shards)} shards")
             print(
                 "Downloading starting now, check your bandwidth speed (with bwm-ng),"
@@ -143,4 +137,4 @@ class URLShardGeneratorFromCSV:
 
             for shard_id, arrow_file in shards:
                 yield arrow_file, shard_id
-            start_shard_id += number_shards
+            start_shard_id += n_shards
